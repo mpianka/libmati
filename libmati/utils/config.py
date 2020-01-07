@@ -10,11 +10,11 @@ log = logging.get_logger(__name__)
 class YamlConfig:
     def __init__(self, path: str = None):
         self.path = path
-        self.config: dict = dict()
+        self.config: dict = self.load()
 
     @property
     def config_path(self):
-        return self.path or os.path.join(os.getcwd(), "libmati.yaml")
+        return self.path or os.path.join(os.getcwd(), "etc", "libmati.yaml")
 
     def load(self):
         if os.path.exists(self.config_path):

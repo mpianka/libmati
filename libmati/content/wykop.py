@@ -6,6 +6,9 @@ from youtube_dl.YoutubeDL import YoutubeDL
 from libmati.utils.config import sget
 from libmati.utils.content import ContentProvider, Content
 from libmati.utils.exceptions import ConfigError, ContentError
+from libmati.utils.logging import get_logger
+
+log = get_logger(__name__)
 
 
 class WykopMikroblogContentProvider(ContentProvider):
@@ -45,8 +48,10 @@ class WykopMikroblogContentProvider(ContentProvider):
         while len(entries) < limit:
             current = []
             if tag:
+                log.info(f"Calling WykopAPI for page {page} of #{tag} entries...")
                 current = self.api.get_tag_entries(tag, page)['data']
             else:
+                log.info(f"Calling WykopAPI for page {page} of hot entries (for {hot_entries_period}h period)...")
                 current = self.api.get_hot_entries(hot_entries_period, page)['data']
 
             # check if they have 'embed' field (so they have content) and
@@ -64,26 +69,38 @@ class WykopMikroblogContentProvider(ContentProvider):
 
     def get_single(self, url):
         entry_id = url.split('/')[-1]
+        log.info(f"Calling WykopAPI for single item (#{entry_id})")
+
         entry = self.api.get_entry(entry_id)
 
         return self._get_content(entry)
 
     def _get_content(self, entry):
         # if embed.url is not an internal wykop's link, try to find origin and grab direct link for it
+        log.info(f"Found new Content entry from WykopAPI: #{sget(entry, 'cid')}")
+
         embed_url = sget(entry, 'embed.url')
         content_external = None
         if 'streamable' in embed_url:
+            log.info(f"Entry #{sget(entry, 'cid')} is from Streamable, correcting URLs...")
+
             content_external = entry['embed']['url']
             entry['embed']['url'] = YoutubeDL().extract_info(embed_url, download=False)['url']
         elif 'gfycat' in embed_url:
+            log.info(f"Entry #{sget(entry, 'cid')} is from Gfycat, correcting URLs...")
+
             content_external = entry['embed']['url']
             entry['embed']['url'] = YoutubeDL().extract_info(embed_url, download=False)['url']
         elif 'youtube' in embed_url:
+            log.info(f"Entry #{sget(entry, 'cid')} is from YouTube, correcting URLs...")
+
             content_external = entry['embed']['url']
             entry['embed']['url'] = YoutubeDL().extract_info(embed_url, download=False)['url']
         elif 'wykop' in embed_url:
+            log.info(f"Entry #{sget(entry, 'cid')} is internal Wykop\'s content")
             pass
         else:
+            log.error(f"Found unsupported content type for entry #{entry['id']}. Check it manually.")
             raise ContentError(f"Unknown content type for #{entry['id']} [{entry['embed']['url']}]")
 
         return Content(
